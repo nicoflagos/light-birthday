@@ -62,21 +62,39 @@ const slides = document.querySelectorAll(".slide");
 
 function loadSlideImage(index) {
     const slide = slides[index];
-    if (!slide || slide.src || !slide.dataset.src) return;
+    if (!slide || slide.dataset.failed || slide.src || !slide.dataset.src) return;
     slide.src = slide.dataset.src;
 }
 
 if (slides.length > 0) {
+    slides.forEach((slide) => {
+        slide.addEventListener('error', () => {
+            slide.dataset.failed = 'true';
+            slide.classList.remove('active');
+            if (slides[slideIndex] === slide) {
+                showNextSlide();
+            }
+        });
+    });
+
+    function showNextSlide() {
+        slides[slideIndex].classList.remove("active");
+
+        for (let attempts = 0; attempts < slides.length; attempts++) {
+            slideIndex = (slideIndex + 1) % slides.length;
+            if (!slides[slideIndex].dataset.failed) {
+                loadSlideImage(slideIndex);
+                loadSlideImage((slideIndex + 1) % slides.length);
+                slides[slideIndex].classList.add("active");
+                return;
+            }
+        }
+    }
+
     loadSlideImage(0);
     loadSlideImage(1);
 
-    setInterval(() => {
-        slides[slideIndex].classList.remove("active");
-        slideIndex = (slideIndex + 1) % slides.length;
-        loadSlideImage(slideIndex);
-        loadSlideImage((slideIndex + 1) % slides.length);
-        slides[slideIndex].classList.add("active");
-    }, 3000);
+    setInterval(showNextSlide, 3000);
 }
 
 // MESSAGE + CONFETTI
