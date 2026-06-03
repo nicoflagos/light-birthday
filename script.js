@@ -1,12 +1,12 @@
-// PREVIEW MODE: reveal the full birthday experience 5 minutes after page load.
-// Switch back before publishing: new Date(2026, 5, 6, 0, 0, 0).getTime()
-const targetDate = Date.now() + (5 * 60 * 1000);
+// COUNTDOWN (Birthday target: June 6, 2026 00:00:00)
+const targetDate = new Date(2026, 5, 6, 0, 0, 0).getTime();
 const forceRevealWishes = new URLSearchParams(window.location.search).has('showWishes');
 const APPROVED_STATUS = 'approved';
 
 let timerActive = true;
 const heroMessage = document.querySelector('.heroMessage');
 const confettiContainer = document.getElementById('confettiContainer');
+let confettiLoop;
 
 function updateCountdown() {
     if (!timerActive) return;
@@ -109,11 +109,17 @@ function launchConfetti() {
     }, 5000);
 }
 
+function startConfettiLoop() {
+    if (confettiLoop) return;
+    launchConfetti();
+    confettiLoop = setInterval(launchConfetti, 30000);
+}
+
 function revealBirthdayMessage(isBirthday) {
     if (heroMessage) {
         if (isBirthday) {
             heroMessage.classList.remove('hidden');
-            launchConfetti();
+            startConfettiLoop();
         } else {
             heroMessage.classList.add('hidden');
         }
