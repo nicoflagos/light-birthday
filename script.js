@@ -2,6 +2,9 @@
 const targetDate = new Date(2026, 5, 6, 0, 0, 0).getTime();
 
 let timerActive = true;
+const heroMessage = document.querySelector('.heroMessage');
+const confettiContainer = document.getElementById('confettiContainer');
+
 function updateCountdown() {
     if (!timerActive) return;
     
@@ -61,9 +64,6 @@ setInterval(() => {
 }, 3000);
 
 // MESSAGE + CONFETTI
-const heroMessage = document.querySelector('.heroMessage');
-const confettiContainer = document.getElementById('confettiContainer');
-
 function createConfettiPiece() {
     const confetti = document.createElement('div');
     confetti.className = 'confetti';
@@ -104,8 +104,11 @@ function revealBirthdayMessage(isBirthday) {
     }
 }
 
-// LocalStorage key for saved wishes
-const STORAGE_KEY = 'birthday_wishes_2026';
+const SUPABASE_URL = 'https://yqloiatsvvuejgtyqvng.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxbG9pYXRzdnZ1ZWpndHlxdm5nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTg5NjEsImV4cCI6MjA5NjA3NDk2MX0.DPEIppXivX4e-I-JKb_X1OO3kUfBQ9oBJruPD_MyELs';
+const supabaseClient = window.supabase
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
 
 function escapeHtml(unsafe) {
     return unsafe
@@ -116,38 +119,24 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 
-function loadWishes() {
-    try {
-        // Try server first
-        return []; // placeholder; server fetch used elsewhere
-    } catch (e) {
-        return [];
-    }
-}
-
-function saveWishes(arr) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
-}
-
-function getLocalWishes() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-}
-
 async function fetchApprovedWishes() {
     try {
-        const res = await fetch('/api/wishes?status=approved');
-        if (!res.ok) throw new Error('API unavailable');
-        const json = await res.json();
-        return json.wishes || [];
-    } catch (apiError) {
+        if (!supabaseClient) throw new Error('Supabase client unavailable');
+        const { data, error } = await supabaseClient
+            .from('wishes')
+            .select('id, name, message, created_at, status')
+            .eq('status', 'approved')
+            .order('created_at', { ascending: true });
+        if (error) throw error;
+        return data || [];
+    } catch (supabaseError) {
         try {
             const res = await fetch('wishes_db.json');
             if (!res.ok) throw new Error('Static wishes unavailable');
             const wishes = await res.json();
             return wishes.filter(w => !w.status || w.status === 'approved');
         } catch (staticError) {
-            return getLocalWishes();
+            return [];
         }
     }
 }
@@ -160,6 +149,7 @@ function updateWishesCount(count) {
 
 async function renderWishes(revealed) {
     const list = document.getElementById('wishesList');
+    if (!list) return;
     if (!revealed) {
         list.classList.add('hidden');
         // also update count by fetching approved count
@@ -203,32 +193,20 @@ function initWishesForm() {
         if (!message) return;
         disableForm(form);
         try {
-            // On June 6, auto-approve by adding status: 'approved'
-            const isBirthday = Date.now() >= targetDate;
-            const payload = { name, message };
-            if (isBirthday) payload.status = 'approved';
-            
-            // try server
-            const res = await fetch('/api/wishes', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (res.ok) {
-                showAlert('✨ Your wish has been saved! Thank you!');
+            if (!supabaseClient) throw new Error('Supabase client unavailable');
+            const { error } = await supabaseClient
+                .from('wishes')
+                .insert([{ name: name || 'Anonymous', message, status: 'approved' }]);
+            if (error) throw error;
+            if (!error) {
+                showAlert('your birthday wish has been saved, thank you');
                 form.reset();
                 // On birthday, re-render wishes immediately
-                if (isBirthday) renderWishes(true);
-            } else {
-                throw new Error('Server error');
+                renderWishes(Date.now() >= targetDate);
             }
         } catch (e) {
-            // fallback to local
-            const arr = getLocalWishes();
-            arr.push({ name, message, time: new Date().toISOString(), status: 'approved' });
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
-            showAlert('✨ Your wish has been saved locally! Thank you!');
-            form.reset();
-            renderWishes(Date.now() >= targetDate);
+            showAlert('Sorry, your wish could not be saved. Please try again.');
+            return;
         } finally {
             enableForm(form);
         }
