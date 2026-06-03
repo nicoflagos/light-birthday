@@ -129,6 +129,29 @@ function saveWishes(arr) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
 }
 
+function getLocalWishes() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+}
+
+async function fetchApprovedWishes() {
+    try {
+        const res = await fetch('/api/wishes?status=approved');
+        if (!res.ok) throw new Error('API unavailable');
+        const json = await res.json();
+        return json.wishes || [];
+    } catch (apiError) {
+        try {
+            const res = await fetch('wishes_db.json');
+            if (!res.ok) throw new Error('Static wishes unavailable');
+            const wishes = await res.json();
+            return wishes.filter(w => !w.status || w.status === 'approved');
+        } catch (staticError) {
+            return getLocalWishes();
+        }
+    }
+}
+
 function updateWishesCount(count) {
     const countEl = document.getElementById('wishesCount');
     if (!countEl) return;
@@ -140,48 +163,22 @@ async function renderWishes(revealed) {
     if (!revealed) {
         list.classList.add('hidden');
         // also update count by fetching approved count
-        try {
-            const res = await fetch('/api/wishes?status=approved');
-            const json = await res.json();
-            updateWishesCount(json.wishes.length);
-        } catch (e) {
-            // fallback to local count
-            const raw = localStorage.getItem(STORAGE_KEY);
-            const arr = raw ? JSON.parse(raw) : [];
-            updateWishesCount(arr.length);
-        }
+        const wishes = await fetchApprovedWishes();
+        updateWishesCount(wishes.length);
         return;
     }
     list.innerHTML = '';
-    try {
-        const res = await fetch('/api/wishes?status=approved');
-        const json = await res.json();
-        const wishes = json.wishes || [];
-        wishes.forEach(w => {
-            const el = document.createElement('div');
-            el.className = 'wishItem';
-            const name = escapeHtml(w.name || 'Anonymous');
-            const msg = escapeHtml(w.message || '');
-            el.innerHTML = `<strong>${name}</strong><p>${msg}</p>`;
-            list.appendChild(el);
-        });
-        updateWishesCount(wishes.length);
-        list.classList.remove('hidden');
-    } catch (e) {
-        // offline fallback to localStorage
-        const raw = localStorage.getItem(STORAGE_KEY);
-        const wishes = raw ? JSON.parse(raw) : [];
-        wishes.forEach(w => {
-            const el = document.createElement('div');
-            el.className = 'wishItem';
-            const name = escapeHtml(w.name || 'Anonymous');
-            const msg = escapeHtml(w.message || '');
-            el.innerHTML = `<strong>${name}</strong><p>${msg}</p>`;
-            list.appendChild(el);
-        });
-        updateWishesCount(wishes.length);
-        list.classList.remove('hidden');
-    }
+    const wishes = await fetchApprovedWishes();
+    wishes.forEach(w => {
+        const el = document.createElement('div');
+        el.className = 'wishItem';
+        const name = escapeHtml(w.name || 'Anonymous');
+        const msg = escapeHtml(w.message || '');
+        el.innerHTML = `<strong>${name}</strong><p>${msg}</p>`;
+        list.appendChild(el);
+    });
+    updateWishesCount(wishes.length);
+    list.classList.remove('hidden');
 }
 
 function showAlert(msg) {
@@ -226,8 +223,7 @@ function initWishesForm() {
             }
         } catch (e) {
             // fallback to local
-            const raw = localStorage.getItem(STORAGE_KEY);
-            const arr = raw ? JSON.parse(raw) : [];
+            const arr = getLocalWishes();
             arr.push({ name, message, time: new Date().toISOString(), status: 'approved' });
             localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
             showAlert('✨ Your wish has been saved locally! Thank you!');
@@ -246,15 +242,8 @@ initWishesForm();
 async function updateBadge() {
     const badge = document.getElementById('badge');
     if (!badge) return;
-    try {
-        const res = await fetch('/api/wishes?status=approved');
-        const json = await res.json();
-        badge.textContent = (json.wishes && json.wishes.length) ? json.wishes.length : 0;
-    } catch (e) {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        const arr = raw ? JSON.parse(raw) : [];
-        badge.textContent = arr.length || 0;
-    }
+    const wishes = await fetchApprovedWishes();
+    badge.textContent = wishes.length || 0;
 }
 updateBadge();
 
