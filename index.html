@@ -11,11 +11,12 @@
 </head>
 
 <body>
+    <div id="confettiContainer"></div>
 
     <div class="container">
 
         <h1>For <span class="glow">Light</span> ✨</h1>
-        <p class="subtitle">our first val together</p>
+        <p class="subtitle">HAPPY BIRTHDAY! LIGHT✨ </p>
 
         <div id="countdown">
             <div><span id="days"></span>Days</div>
@@ -24,7 +25,10 @@
             <div><span id="seconds"></span>Seconds</div>
         </div>
 
-        <button id="surpriseBtn">Click for a Surprise 💌</button>
+        <div class="heroMessage hidden">
+            <h2>Wishing you the happiest birthday my dear ❤️ </h2>
+            <p>On this special day, I want to express how much you mean to me. You are the light of my life, and I am so grateful for every moment we share together. May your birthday be filled with love, laughter, and all the things that bring you joy. Happy Birthday🎉❤️With all my love.!</p>
+        </div>
 
         <div class="slideshow">
             <img src="images/photo1.jpg" class="slide active">
@@ -41,18 +45,30 @@
 
         <audio id="loveSong" src="music/song.mp3"></audio>
 
-        <div id="message" class="hidden">
-            <h2 class="glow">Light ❤️</h2>
-            <p id="typedText"></p>
-            <p id="signature" class="signature"></p>
-        </div>
+        <!-- Birthday wishes -->
+            <div id="wishesSection">
+                <h2>Please leave a Birthday Wish</h2>
+                <p id="preBirthdayNotice">Wishes will be revealed on her birthday.</p>
+
+                <form id="wishesForm">
+                    <input id="wishName" type="text" placeholder="Your name" required />
+                    <textarea id="wishMessage" placeholder="Write your birthday wish..." required></textarea>
+                    <button type="submit">Send Wish</button>
+                </form>
+
+                <p id="wishesCount"></p>
+                <div id="wishesList" class="hidden"></div>
+            </div>
 
     </div>
 
-    <!-- Final Valentine Screen -->
-    <div id="valentineScreen" class="valentine-hidden">
-        <h1 class="glow">Happy Valentine’s Day, Light ❤️</h1>
-        <p>This is our first val together… and I wouldn’t want it with anyone else.</p>
+    <!-- Admin Login Modal -->
+    <div id="adminLoginModal" class="hidden modal-overlay">
+        <div class="modal-content">
+            <h2>🔐 Admin Login</h2>
+            <input id="adminPasswordInput" type="password" placeholder="Enter admin password" />
+            <button id="adminLoginBtn">Login</button>
+        </div>
     </div>
 
 <script src="script.js"></script>
