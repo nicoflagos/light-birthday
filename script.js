@@ -1,5 +1,6 @@
-// COUNTDOWN (Birthday target: June 6, 2026 00:00:00)
-const targetDate = new Date(2026, 5, 6, 0, 0, 0).getTime();
+// PREVIEW MODE: reveal the full birthday experience 5 minutes after page load.
+// Switch back before publishing: new Date(2026, 5, 6, 0, 0, 0).getTime()
+const targetDate = Date.now() + (5 * 60 * 1000);
 const forceRevealWishes = new URLSearchParams(window.location.search).has('showWishes');
 const APPROVED_STATUS = 'approved';
 
