@@ -1,5 +1,7 @@
 // COUNTDOWN (Birthday target: June 6, 2026 00:00:00)
 const targetDate = new Date(2026, 5, 6, 0, 0, 0).getTime();
+const forceRevealWishes = new URLSearchParams(window.location.search).has('showWishes');
+const APPROVED_STATUS = 'approved';
 
 let timerActive = true;
 const heroMessage = document.querySelector('.heroMessage');
@@ -57,11 +59,24 @@ if (isBirthdayOnLoad) {
 let slideIndex = 0;
 const slides = document.querySelectorAll(".slide");
 
-setInterval(() => {
-    slides[slideIndex].classList.remove("active");
-    slideIndex = (slideIndex + 1) % slides.length;
-    slides[slideIndex].classList.add("active");
-}, 3000);
+function loadSlideImage(index) {
+    const slide = slides[index];
+    if (!slide || slide.src || !slide.dataset.src) return;
+    slide.src = slide.dataset.src;
+}
+
+if (slides.length > 0) {
+    loadSlideImage(0);
+    loadSlideImage(1);
+
+    setInterval(() => {
+        slides[slideIndex].classList.remove("active");
+        slideIndex = (slideIndex + 1) % slides.length;
+        loadSlideImage(slideIndex);
+        loadSlideImage((slideIndex + 1) % slides.length);
+        slides[slideIndex].classList.add("active");
+    }, 3000);
+}
 
 // MESSAGE + CONFETTI
 function createConfettiPiece() {
@@ -125,7 +140,7 @@ async function fetchApprovedWishes() {
         const { data, error } = await supabaseClient
             .from('wishes')
             .select('id, name, message, created_at, status')
-            .eq('status', 'approved')
+            .eq('status', APPROVED_STATUS)
             .order('created_at', { ascending: true });
         if (error) throw error;
         return data || [];
@@ -134,7 +149,7 @@ async function fetchApprovedWishes() {
             const res = await fetch('wishes_db.json');
             if (!res.ok) throw new Error('Static wishes unavailable');
             const wishes = await res.json();
-            return wishes.filter(w => !w.status || w.status === 'approved');
+            return wishes.filter(w => !w.status || w.status === APPROVED_STATUS);
         } catch (staticError) {
             return [];
         }
@@ -144,7 +159,7 @@ async function fetchApprovedWishes() {
 function updateWishesCount(count) {
     const countEl = document.getElementById('wishesCount');
     if (!countEl) return;
-    countEl.textContent = typeof count === 'number' ? `Saved wishes: ${count}` : 'No wishes yet. Be the first!';
+    countEl.textContent = typeof count === 'number' ? `Saved wishes: ${count}` : 'Saved wishes: unavailable right now';
 }
 
 async function renderWishes(revealed) {
@@ -194,17 +209,22 @@ function initWishesForm() {
         disableForm(form);
         try {
             if (!supabaseClient) throw new Error('Supabase client unavailable');
+            const wish = {
+                name: name || 'Anonymous',
+                message,
+                status: APPROVED_STATUS
+            };
             const { error } = await supabaseClient
                 .from('wishes')
-                .insert([{ name: name || 'Anonymous', message, status: 'approved' }]);
+                .insert([wish]);
             if (error) throw error;
             if (!error) {
                 showAlert('your birthday wish has been saved, thank you');
                 form.reset();
-                // On birthday, re-render wishes immediately
-                renderWishes(Date.now() >= targetDate);
+                renderWishes(forceRevealWishes || Date.now() >= targetDate);
             }
         } catch (e) {
+            console.error('Wish save failed:', e);
             showAlert('Sorry, your wish could not be saved. Please try again.');
             return;
         } finally {
@@ -227,6 +247,12 @@ updateBadge();
 
 // Initialize wishes display on non-birthday page loads
 if (!isBirthdayOnLoad) {
-    renderWishes(false);
+    renderWishes(forceRevealWishes);
+    if (forceRevealWishes) {
+        const notice = document.getElementById('preBirthdayNotice');
+        if (notice) {
+            notice.textContent = 'Preview mode: saved wishes are visible before her birthday.';
+        }
+    }
 }
 
