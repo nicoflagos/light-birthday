@@ -1,5 +1,5 @@
-// COUNTDOWN (Birthday target: June 3, 2026 2:18pm)
-const targetDate = new Date("Jun 3, 2026 14:18:00").getTime();
+// COUNTDOWN (Birthday target: June 3, 2026 2:18pm local time)
+const targetDate = new Date(2026, 5, 3, 14, 18, 0).getTime();
 
 let timerActive = true;
 function updateCountdown() {
