@@ -14,7 +14,7 @@ function updateCountdown() {
         renderWishes(true);
         const notice = document.getElementById('preBirthdayNotice');
         if (notice) {
-            notice.textContent = 'All approved wishes are now visible below. Thank you for celebrating!';
+            notice.textContent = 'All wishes are now visible below. Thank you for celebrating!';
         }
         timerActive = false;
         clearInterval(timer);
@@ -45,7 +45,7 @@ if (isBirthdayOnLoad) {
     launchConfetti();
     const notice = document.getElementById('preBirthdayNotice');
     if (notice) {
-        notice.textContent = 'All approved wishes are now visible below. Thank you for celebrating!';
+        notice.textContent = 'All wishes are now visible below. Thank you for celebrating!';
     }
 }
 
@@ -176,7 +176,6 @@ async function renderWishes(revealed) {
             el.className = 'wishItem';
             const name = escapeHtml(w.name || 'Anonymous');
             const msg = escapeHtml(w.message || '');
-            const time = new Date(w.time).toLocaleString();
             el.innerHTML = `<strong>${name}</strong><p>${msg}</p>`;
             list.appendChild(el);
         });
@@ -187,11 +186,6 @@ async function renderWishes(revealed) {
 
 function showAlert(msg) {
     alert(msg);
-}
-
-function adminMode() {
-    const url = new URL(window.location.href);
-    return url.searchParams.get('admin') === '1';
 }
 
 function disableForm(form) {
@@ -248,7 +242,7 @@ function initWishesForm() {
 // On page load: initialize form and decide whether to reveal wishes
 initWishesForm();
 
-// update badge with approved wishes count
+// update wish badge count
 async function updateBadge() {
     const badge = document.getElementById('badge');
     if (!badge) return;
@@ -263,127 +257,6 @@ async function updateBadge() {
     }
 }
 updateBadge();
-
-// ADMIN: moderation panel
-function createAdminPanel() {
-    if (!adminMode()) return;
-    const pwd = sessionStorage.getItem('admin_pwd');
-    if (!pwd) {
-        showAdminLoginModal();
-        return;
-    }
-    showModerationUI();
-}
-
-function showAdminLoginModal() {
-    const modal = document.getElementById('adminLoginModal');
-    const input = document.getElementById('adminPasswordInput');
-    const btn = document.getElementById('adminLoginBtn');
-    modal.classList.remove('hidden');
-    input.focus();
-    btn.addEventListener('click', handleAdminLogin);
-    input.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleAdminLogin();
-    });
-}
-
-function handleAdminLogin() {
-    const pwd = document.getElementById('adminPasswordInput').value;
-    if (!pwd) return;
-    sessionStorage.setItem('admin_pwd', pwd);
-    document.getElementById('adminLoginModal').classList.add('hidden');
-    showModerationUI();
-}
-
-function showModerationUI() {
-    const panel = document.createElement('div');
-    panel.id = 'adminPanel';
-    const exportBtn = document.createElement('button');
-    exportBtn.textContent = '📥 Export Wishes (JSON)';
-    exportBtn.style.marginBottom = '12px';
-    exportBtn.addEventListener('click', exportWishes);
-    panel.innerHTML = '<h3>📋 Admin Moderation</h3><div id="pendingList">Loading pending wishes...</div>';
-    panel.insertBefore(exportBtn, panel.firstChild);
-    const container = document.querySelector('.container');
-    if (container.querySelector('#adminPanel')) container.querySelector('#adminPanel').remove();
-    container.appendChild(panel);
-    fetchPending();
-}
-
-async function exportWishes() {
-    const pwd = sessionStorage.getItem('admin_pwd');
-    try {
-        const res = await fetch('/api/wishes/export/json', {
-            headers: { 'X-Admin-Password': pwd }
-        });
-        if (!res.ok) {
-            alert('Export failed: Unauthorized');
-            return;
-        }
-        const data = await res.json();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `birthday-wishes-${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        alert('Wishes exported successfully!');
-    } catch (e) {
-        alert('Export error: ' + e.message);
-    }
-}
-
-async function fetchPending() {
-    const list = document.getElementById('pendingList');
-    const pwd = sessionStorage.getItem('admin_pwd');
-    try {
-        const res = await fetch('/api/wishes?status=pending');
-        const json = await res.json();
-        const wishes = json.wishes || [];
-        if (!wishes.length) {
-            list.innerHTML = '<p>No pending wishes.</p>';
-            return;
-        }
-        list.innerHTML = '';
-        wishes.forEach(w => {
-            const el = document.createElement('div');
-            el.className = 'wishItem';
-            el.innerHTML = `<strong>${escapeHtml(w.name||'Anonymous')}</strong> <span class="wishTime">${new Date(w.time).toLocaleString()}</span><p>${escapeHtml(w.message)}</p>`;
-            const btnApprove = document.createElement('button');
-            btnApprove.textContent = '✅ Approve';
-            btnApprove.style.marginRight = '8px';
-            btnApprove.addEventListener('click', async () => {
-                if (confirm('Approve this wish?')) {
-                    await fetch(`/api/wishes/${w.id}/approve`, { 
-                        method: 'POST',
-                        headers: { 'X-Admin-Password': pwd }
-                    });
-                    fetchPending();
-                }
-            });
-            const btnDelete = document.createElement('button');
-            btnDelete.textContent = '🗑️ Delete';
-            btnDelete.style.background = '#ff6b6b';
-            btnDelete.addEventListener('click', async () => {
-                if (confirm('Delete this wish permanently?')) {
-                    await fetch(`/api/wishes/${w.id}`, { 
-                        method: 'DELETE',
-                        headers: { 'X-Admin-Password': pwd }
-                    });
-                    fetchPending();
-                }
-            });
-            el.appendChild(btnApprove);
-            el.appendChild(btnDelete);
-            list.appendChild(el);
-        });
-    } catch (e) {
-        list.innerHTML = '<p>Could not load pending wishes.</p>';
-    }
-}
-
-createAdminPanel();
 
 // Initialize wishes display on non-birthday page loads
 if (!isBirthdayOnLoad) {
