@@ -1,5 +1,5 @@
-// COUNTDOWN (Birthday target: June 6, 2026 00:00:00)
-const targetDate = new Date(2026, 5, 6, 0, 0, 0).getTime();
+// COUNTDOWN (Birthday target: June 6, 2026 00:00:00 Africa/Algiers)
+const targetDate = new Date('2026-06-05T23:00:00Z').getTime();
 const forceRevealWishes = new URLSearchParams(window.location.search).has('showWishes');
 const APPROVED_STATUS = 'approved';
 
@@ -7,6 +7,8 @@ let timerActive = true;
 const heroMessage = document.querySelector('.heroMessage');
 const confettiContainer = document.getElementById('confettiContainer');
 let confettiLoop;
+let wishesRefreshLoop;
+let wishesAreVisible = false;
 
 function updateCountdown() {
     if (!timerActive) return;
@@ -160,21 +162,43 @@ function escapeHtml(unsafe) {
 }
 
 async function fetchApprovedWishes() {
+    const normalizeWish = (wish) => ({
+        id: wish.id,
+        name: wish.name || 'Anonymous',
+        message: wish.message || '',
+        created_at: wish.created_at || wish.time || '',
+        status: wish.status || APPROVED_STATUS
+    });
+
+    const sortWishes = (wishes) => wishes
+        .map(normalizeWish)
+        .filter(w => w.message && w.status !== 'rejected')
+        .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+
     try {
         if (!supabaseClient) throw new Error('Supabase client unavailable');
         const { data, error } = await supabaseClient
             .from('wishes')
             .select('id, name, message, created_at, status')
-            .eq('status', APPROVED_STATUS)
             .order('created_at', { ascending: true });
         if (error) throw error;
-        return data || [];
+        return sortWishes(data || []);
     } catch (supabaseError) {
         try {
-            const res = await fetch('wishes_db.json');
+            const apiRes = await fetch(`/api/wishes?status=all&cache=${Date.now()}`);
+            if (apiRes.ok) {
+                const payload = await apiRes.json();
+                return sortWishes(payload.wishes || []);
+            }
+        } catch (apiError) {
+            // Static hosting will not have the API route, so continue to the JSON fallback.
+        }
+
+        try {
+            const res = await fetch(`wishes_db.json?cache=${Date.now()}`);
             if (!res.ok) throw new Error('Static wishes unavailable');
             const wishes = await res.json();
-            return wishes.filter(w => !w.status || w.status === APPROVED_STATUS);
+            return sortWishes(wishes);
         } catch (staticError) {
             return [];
         }
@@ -190,6 +214,7 @@ function updateWishesCount(count) {
 async function renderWishes(revealed) {
     const list = document.getElementById('wishesList');
     if (!list) return;
+    wishesAreVisible = revealed;
     if (!revealed) {
         list.classList.add('hidden');
         // also update count by fetching approved count
@@ -209,6 +234,15 @@ async function renderWishes(revealed) {
     });
     updateWishesCount(wishes.length);
     list.classList.remove('hidden');
+}
+
+function startWishesRefresh() {
+    if (wishesRefreshLoop) return;
+    wishesRefreshLoop = setInterval(() => {
+        if (wishesAreVisible) {
+            renderWishes(true);
+        }
+    }, 15000);
 }
 
 function showAlert(msg) {
@@ -274,10 +308,13 @@ updateBadge();
 if (!isBirthdayOnLoad) {
     renderWishes(forceRevealWishes);
     if (forceRevealWishes) {
+        startWishesRefresh();
         const notice = document.getElementById('preBirthdayNotice');
         if (notice) {
             notice.textContent = 'Preview mode: saved wishes are visible before her birthday.';
         }
     }
+} else {
+    startWishesRefresh();
 }
 
